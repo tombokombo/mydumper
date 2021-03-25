@@ -223,6 +223,7 @@ int main(int argc, char *argv[]) {
 
 void restore_databases(struct configuration *conf, MYSQL *conn) {
   GError *error = NULL;
+  GRand *rand = NULL;
   GDir *dir = g_dir_open(directory, 0, &error);
 
   if (error) {
@@ -256,6 +257,7 @@ void restore_databases(struct configuration *conf, MYSQL *conn) {
     }
   }
   g_dir_rewind(dir);
+  GSList *file_list = NULL;
   while ((filename = g_dir_read_name(dir))) {
     if (!source_db ||
         g_str_has_prefix(filename, g_strdup_printf("%s.", source_db))) {
@@ -265,11 +267,23 @@ void restore_databases(struct configuration *conf, MYSQL *conn) {
           !g_strrstr(filename, "-schema-post.sql") &&
           !g_strrstr(filename, "-schema-create.sql") &&
           g_strrstr(filename, ".sql")) {
-        add_table(filename, conf);
+          file_list = g_slist_append(file_list, g_strdup(filename));
       }
     }
   }
-
+  rand = g_rand_new();
+  guint len;
+  gint32 rand_pos;
+  while (len = g_slist_length(file_list), len > 0 ) {
+    rand_pos = g_rand_int_range(rand, 0, len);
+    filename = g_slist_nth_data(file_list, rand_pos);
+    if(filename == NULL) {
+        // should never happen
+        break;
+    }
+    file_list = g_slist_delete_link(file_list, g_slist_nth(file_list, rand_pos));
+    add_table(filename, conf);
+  }
   g_dir_close(dir);
 }
 
